@@ -14,20 +14,27 @@ const io = socket(server, {
 const users = {};
 const socketToRoom = {};
 io.on("connection", (socket) => {
-  //conection
+  // conection
   socket.on("uui", (roomID) => {
-    if (users[roomID]?.length) {
+    if (users[roomID]) {
       // users[roomID].push(socket.id);
       const arr = users[roomID];
       arr.push(socket.id);
       users[roomID] = arr;
+      // console.log(users[roomID]);
+      socketToRoom[socket.id] = roomID;
+      const userInThisRoom = users[roomID].filter((id) => id !== socket.id);
+
+      socket.emit("all user", { userInThisRoom, id: socket.id });
     } else {
       users[roomID] = [socket.id];
     }
-    socketToRoom[socket.id] = roomID;
-    const userInThisRoom = users[roomID].filter((id) => id !== socket.id);
-    socket.emit("all user", userInThisRoom);
   });
+  socket.on("id", (id) => {
+    const roomID = socketToRoom[socket.id];
+    socket.broadcast.emit("global send", id);
+  });
+
   socket.on("sanding signal", (paylod) => {
     io.to(paylod.remoteSocketid).emit("user join", {
       signal: paylod.signal,
@@ -41,8 +48,16 @@ io.on("connection", (socket) => {
       id: socket.id,
     });
   });
+
   socket.on("disconnect", () => {
-    io.emit("dis", "one user is disconnected.");
+    // console.log(socket.id);
+    const roomID = socketToRoom[socket.id];
+    socket.broadcast.emit("take leave", { id: socket.id });
+    let room = users[roomID];
+    if (room) {
+      room = room.filter((id) => id !== socket.id);
+      users[roomID] = room;
+    }
   });
 });
 //route
